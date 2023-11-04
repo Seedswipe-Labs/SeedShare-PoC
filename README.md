@@ -1,18 +1,29 @@
-# SeedShare
+# SeedSwipe Technical Architecture 
 
-**Welcome to SeedShare: an ERC1155-Based multi-token Share contract, Shareholder registry and compliance suite.**
+For a detailed explanation of the SeedSwipe ecosystem we encourage you read the whitepaper: [link]
+
+This repo acts as a tested Proof of Concept (PoC) of the for the modified SeedShare ERC1155 token using Solidity but will be converted to Soroban for the Stellar blockchain. This was vital to prove the deign worked. The technical implementation and description for the SeedSwipe Ecosystem is as follows:
+
+## SeedSwipe
+
+## SeedShare
+
+## SeedClaim
+
+## SeedBase
+
 
 SeedShare is a toolkit for asset tokenisation, allowing entrepreneurs to create and manage tokenised equity, automate compliance and raise venture funding. For investors, SeedShare provides a platform to realise unprecedented liquidity on assets that would have previously been immobile, enabling equity Shares to be traded like any other crypto asset.
 
-## SeedShare.sol
+#### SeedShare.sol
 
 SeedShare is an ERC1155 Based tokenised equity contract. It provides all the functions traditionally associated with an ERC1155 token contract, plus additional issuer controls designed (and legally required in some jurisdictions) to support for equity Shares. These features include forced transfers and Share recovery in the event that a Shareholder has lost access to their wallet.
 
-## SeedCoreCompliance.sol
+#### SeedCoreCompliance.sol
 
 SeedCoreCompliance works in tandem with SeedShare and the SeedBaseClaimRegistry, recording which attributes a prospective Shareholder must have in order to receive Shares. These attributes are known as claims. Unless a user is whitelisted, when a Share transfer is initiated the SeedCoreCompliance contract iterates through the necessary claims, comparing them against the claims held by the prospective Shareholder in the SeedBaseClaimRegistry. 
 
-## SeedCoreRegistry.sol
+#### SeedCoreRegistry.sol
 
 SeedCoreRegistry keeps an on-chain record of the Shareholders of its corresponding SeedShare contract. It then uses this record to enforce limit-Based compliance checks, such as ensuring that a Share transfer does not result in too many Shareholders, fractional Shareholdings or  that a Shareholder has not been frozen by the owner-operator.
 
