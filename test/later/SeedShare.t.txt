@@ -1,0 +1,211 @@
+// SPDX-License-Identifier: UNLICENSED
+
+pragma solidity ^0.8.13;
+
+import "forge-std/Test.sol";
+import "forge-std/Vm.sol";
+
+import "./utils/Utils.sol";
+
+import "../src/SeedShare/SeedShare.sol";
+import "../src/SeedShare/SeedCoreRegistry.sol";
+
+contract SeedShareTest is Test {
+    
+    SeedShare public _SeedShare;
+    SeedCoreRegistry public _registry;
+    
+    Utils public _utils;
+    
+    uint256 _noShareholders = 4;
+    
+    address[] public _Shareholders;
+    uint256[] public _Shares;
+
+    function setUp() public {
+
+        // Get utils
+        _utils = new Utils();
+
+        // Create testing payees
+        _Shareholders = _utils.createUsers(_noShareholders);
+
+        // For number of payees give each a Share of 1
+        for (uint256 i = 0; i < _noShareholders; i++)
+            _Shares.push(100 ether);
+
+        // Set up contracts
+        _SeedShare = new SeedShare(
+            "https://token-uri.com",
+            address(0),
+            address(0)
+        ); 
+
+        _registry = new SeedCoreRegistry(
+            address(_SeedShare),
+            address(0)
+        );
+
+	    _SeedShare.setRegistry(address(_registry));
+    }
+
+    function testcreateToken() public {
+        
+        uint256 startingTokens = _SeedShare.getTotalTokens();
+
+        uint256 _maxNoShareholders = 5;
+        uint256 _minimumShareholding = 5 ether;
+        bool _ShareholdingNonDivisible = true;
+        
+        _SeedShare.createToken(
+            _maxNoShareholders,
+		    _minimumShareholding,
+            _ShareholdingNonDivisible
+	    );
+
+        uint256 id = startingTokens + 1;
+
+        assertTrue(_SeedShare.getTotalTokens() == id, "testcreateToken: incorrect token ID");
+        assertTrue(_registry.getShareholderLimit(id) == _maxNoShareholders, "testcreateToken: incorrect: _maxNoShareholders");
+        assertTrue(_registry.getShareholdingMinimum(id) == _minimumShareholding, "testcreateToken: incorrect: _minimumShareholding");
+        // assertTrue(_registry.checkNonDivisible(id) == _ShareholdingNonDivisible, "testcreateToken: incorrect: _ShareholdingNonDivisible");
+
+    }
+    
+    function testMintGroup() public {
+
+        assertTrue(_Shareholders.length == _Shares.length);
+
+        uint256 id = _SeedShare.getTotalTokens();
+                
+        _SeedShare.mintGroup(
+            _Shareholders,
+            id,
+            _Shares,
+            bytes("TX")
+        );
+
+        for (uint256 i = 0; i < _Shareholders.length; i++)
+            assertTrue(_SeedShare.balanceOf(_Shareholders[i], id) == _Shares[i] && _Shares[i] != 0, "testMintGroup: incorrect Shares");
+
+    }
+    
+    function testSafeTransferFrom() public {
+
+        testMintGroup();
+
+        uint256 startBalance = _SeedShare.balanceOf(_Shareholders[1], 0);
+
+        vm.prank(_Shareholders[0]);
+        
+        _SeedShare.safeTransferFrom(
+            _Shareholders[0],
+            _Shareholders[1],
+            0,
+            10 ether,
+            bytes("TX")
+        );
+        
+        assertTrue((startBalance + 10 ether) == _SeedShare.balanceOf(_Shareholders[1], 0), "testSafeTransferFrom: incorrect balance after transfer");
+    } 
+
+    function testSafeTransferFrom_failFromAddressFrozenAll() public {
+
+        testMintGroup();
+
+        _registry.setFrozenAll(_Shareholders[0], true);
+
+        uint256 startBalance = _SeedShare.balanceOf(_Shareholders[1], 0);
+
+        vm.prank(_Shareholders[0]);
+        
+        vm.expectRevert(bytes("SeedCoreRegistry: Account is frozen"));
+
+        _SeedShare.safeTransferFrom(
+            _Shareholders[0],
+            _Shareholders[1],
+            0,
+            10 ether,
+            bytes("TX")
+        );
+
+    } 
+
+    function testSafeTransferFrom_failFromAddressFrozen() public {
+
+        testMintGroup();
+
+        _registry.setFrozenTokenId(_SeedShare.getTotalTokens(), _Shareholders[0], true);
+
+        uint256 startBalance = _SeedShare.balanceOf(_Shareholders[1], 0);
+
+        vm.prank(_Shareholders[0]);
+        
+        vm.expectRevert(bytes("SeedCoreRegistry: Share type is frozen on this account"));
+        
+        _SeedShare.safeTransferFrom(
+            _Shareholders[0],
+            _Shareholders[1],
+            0,
+            10 ether,
+            bytes("TX")
+        );
+    }
+
+    function testSafeTransferFrom_failFrozenShares() public {
+        
+        testMintGroup();
+        
+        uint256 startBalance = _SeedShare.balanceOf(_Shareholders[1], 0);
+
+        console.log(startBalance);
+        
+        _registry.freezeShares(
+            _Shareholders[0],
+            _SeedShare.getTotalTokens(),
+            10 ether
+        );
+
+        vm.prank(_Shareholders[0]);
+        
+        _SeedShare.safeTransferFrom(
+            _Shareholders[0],
+            _Shareholders[1],
+            0,
+            80 ether,
+            bytes("TX")
+        );
+        
+        assertTrue((startBalance + 80 ether) == _SeedShare.balanceOf(_Shareholders[1], 0), "testSafeTransferFrom: incorrect balance after transfer");
+        
+        // _SeedShare.safeTransferFrom(
+        //     _Shareholders[0],
+        //     _Shareholders[1],
+        //     0,
+        //     10e18,
+        //     bytes("TX")
+        // );
+
+    }
+
+    function testSafeTransferFrom_failMaximumShareholders() public {
+        
+        _noShareholders = 10;
+        
+        generateShareholdersAndShares();
+
+        console.log(_Shareholders.length);
+        console.log(_Shares.length);
+
+        
+    }
+
+    /*
+    
+        require(checkNotFrozenSharesTransfer(amount, id, from), "SeedCoreRegistry: Insufficient unfrozen Balance");
+        require(checkWithinShareholderLimit(id), "SeedCoreRegistry: Transfer exceeds Shareholder limit");
+        require(checkAboveMinimumShareholdingTransfer(to, from, id, amount), "SeedCoreRegistry: Transfer results in Shareholdings below minimum");
+        require(checkAmountNonDivisibleTransfer(to, from, id, amount), "SeedCoreRegistry: Transfer results in fractional Shares");
+
+    */
+}
