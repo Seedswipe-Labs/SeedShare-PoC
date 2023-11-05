@@ -1,4 +1,4 @@
-# SeedSwipe Technical Architecture 
+# SeedShare
 
 For a detailed explanation of the SeedSwipe ecosystem we encourage you read the whitepaper: [link]
 
